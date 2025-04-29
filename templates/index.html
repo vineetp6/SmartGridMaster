@@ -1,0 +1,215 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="dashboard-card p-4">
+            <h1 class="display-5 mb-3">Smart Grid Management System</h1>
+            <p class="lead">
+                An autonomous system for monitoring, forecasting, and optimizing electrical grid operations
+                using real-time data from the Central Electricity Authority.
+            </p>
+            <div class="d-grid gap-2 d-md-flex mt-4">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary me-md-2">
+                    <i class="fas fa-tachometer-alt me-2"></i> Go to Dashboard
+                </a>
+                <a href="{{ url_for('forecasting_view') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-chart-line me-2"></i> View Forecasts
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="dashboard-card p-4">
+            <h4><i class="fas fa-bolt me-2"></i> Quick Stats</h4>
+            <div class="d-flex justify-content-between mt-3 mb-2">
+                <span class="text-secondary">Grid Status:</span>
+                <span class="badge bg-success">Stable</span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-secondary">Current Load:</span>
+                <span id="home-current-load">...</span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-secondary">Renewable %:</span>
+                <span id="home-renewable-percent">...</span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-secondary">Grid Frequency:</span>
+                <span id="home-frequency">...</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span class="text-secondary">Active Alerts:</span>
+                <span id="home-active-alerts">...</span>
+            </div>
+            <hr>
+            <p class="small text-center text-secondary mb-0">
+                Last updated <span id="home-last-updated">...</span>
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h4 class="mb-0"><i class="fas fa-plug me-2"></i> System Overview</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5 class="mb-3">Key Features</h5>
+                        <ul class="list-group list-group-flush bg-transparent">
+                            <li class="list-group-item bg-transparent">
+                                <i class="fas fa-chart-area text-primary me-2"></i> Real-time grid monitoring
+                            </li>
+                            <li class="list-group-item bg-transparent">
+                                <i class="fas fa-chart-line text-success me-2"></i> Power demand forecasting
+                            </li>
+                            <li class="list-group-item bg-transparent">
+                                <i class="fas fa-balance-scale text-info me-2"></i> Automated load balancing
+                            </li>
+                            <li class="list-group-item bg-transparent">
+                                <i class="fas fa-exclamation-triangle text-warning me-2"></i> Fault detection and isolation
+                            </li>
+                            <li class="list-group-item bg-transparent">
+                                <i class="fas fa-leaf text-success me-2"></i> Renewable energy integration
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="mb-3">Data Sources</h5>
+                        <p>
+                            This system integrates with the Central Electricity Authority (CEA) API to access real-time and historical data about India's power grid, including:
+                        </p>
+                        <ul>
+                            <li>Generation and consumption statistics</li>
+                            <li>Regional grid parameters</li>
+                            <li>Renewable energy sources data</li>
+                            <li>Transmission corridor status</li>
+                        </ul>
+                        <p class="small text-secondary mt-3">
+                            <i class="fas fa-info-circle me-1"></i> Data is refreshed automatically every 5 minutes
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="dashboard-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i> Dashboard</h5>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-primary">View</a>
+            </div>
+            <div class="card-body">
+                <p>Comprehensive real-time monitoring of the entire power grid with interactive visualizations.</p>
+                <ul>
+                    <li>Generation and consumption metrics</li>
+                    <li>Regional power distribution</li>
+                    <li>Energy mix breakdown</li>
+                    <li>Geographical grid visualization</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="dashboard-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i> Forecasting</h5>
+                <a href="{{ url_for('forecasting_view') }}" class="btn btn-sm btn-outline-primary">View</a>
+            </div>
+            <div class="card-body">
+                <p>Advanced machine learning models to predict future power demand and plan resource allocation.</p>
+                <ul>
+                    <li>Short-term load forecasting</li>
+                    <li>Regional demand predictions</li>
+                    <li>Capacity planning support</li>
+                    <li>Renewable generation forecasts</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="dashboard-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-balance-scale me-2"></i> Load Balancing</h5>
+                <a href="{{ url_for('load_balancing') }}" class="btn btn-sm btn-outline-primary">View</a>
+            </div>
+            <div class="card-body">
+                <p>Simulates and optimizes power distribution to maintain grid stability and efficiency.</p>
+                <ul>
+                    <li>Inter-regional power transfer</li>
+                    <li>Peak load management</li>
+                    <li>Optimization scenarios</li>
+                    <li>Outage response simulation</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load quick stats for homepage
+    fetch('/api/grid-data')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateHomeStats(data.data);
+            } else {
+                console.error('Error loading grid data:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching grid data:', error);
+        });
+        
+    // Also load fault data
+    fetch('/api/detect-faults')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update active alerts count
+                document.getElementById('home-active-alerts').textContent = 
+                    data.faults.length + ' ' + (data.faults.length === 1 ? 'Issue' : 'Issues');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching fault data:', error);
+        });
+});
+
+function updateHomeStats(data) {
+    // Update quick stats
+    document.getElementById('home-current-load').textContent = 
+        new Intl.NumberFormat().format(data.total_consumption) + ' MW';
+    
+    // Calculate renewable percentage from generation mix
+    const totalGen = data.total_generation || 0;
+    const renewableGen = (
+        (data.generation_mix?.solar || 0) + 
+        (data.generation_mix?.wind || 0) + 
+        (data.generation_mix?.hydro || 0)
+    );
+    const renewablePercent = ((renewableGen / totalGen) * 100).toFixed(1);
+    document.getElementById('home-renewable-percent').textContent = renewablePercent + '%';
+    
+    // Update frequency
+    document.getElementById('home-frequency').textContent = 
+        (data.frequency || 50).toFixed(2) + ' Hz';
+    
+    // Update timestamp
+    const timestamp = new Date(data.timestamp);
+    document.getElementById('home-last-updated').textContent = timestamp.toLocaleTimeString();
+}
+</script>
+{% endblock %}

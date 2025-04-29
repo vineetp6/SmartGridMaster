@@ -1,0 +1,596 @@
+{% extends "layout.html" %}
+
+{% block additional_head %}
+<style>
+    .forecast-card {
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid transparent;
+    }
+    
+    .forecast-card.today {
+        border-left-color: var(--bs-primary);
+    }
+    
+    .forecast-card.future {
+        border-left-color: var(--bs-secondary);
+    }
+    
+    .forecast-params {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2><i class="fas fa-chart-line me-2"></i> Power Demand Forecasting</h2>
+        <p class="text-secondary">
+            Predict future power demand using machine learning models
+        </p>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#forecastHelpModal">
+            <i class="fas fa-question-circle me-1"></i> How It Works
+        </button>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <!-- Forecast Parameters -->
+        <div class="dashboard-card forecast-params">
+            <h4 class="mb-3">Forecast Parameters</h4>
+            <form id="forecast-form">
+                <div class="mb-3">
+                    <label for="forecast-region" class="form-label">Region</label>
+                    <select class="form-select" id="forecast-region" name="region">
+                        <option value="all" selected>All India</option>
+                        <option value="northern">Northern</option>
+                        <option value="western">Western</option>
+                        <option value="southern">Southern</option>
+                        <option value="eastern">Eastern</option>
+                        <option value="northeastern">Northeastern</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="forecast-days" class="form-label">Forecast Period</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="forecast-days" name="days" min="1" max="14" value="7">
+                        <span class="input-group-text">Days</span>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Model Confidence</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="show-confidence" checked>
+                        <label class="form-check-label" for="show-confidence">
+                            Show uncertainty range
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary" id="generate-forecast-btn">
+                        <i class="fas fa-cog me-2"></i> Generate Forecast
+                    </button>
+                </div>
+            </form>
+            
+            <hr>
+            
+            <div class="forecast-info">
+                <h5 class="mb-3">Model Information</h5>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Model Type:</span>
+                    <span>Random Forest</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Training Data:</span>
+                    <span>30 Days</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Features:</span>
+                    <span>9</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Accuracy (R²):</span>
+                    <span id="model-accuracy">...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <!-- Forecast Chart -->
+        <div class="dashboard-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i> Demand Forecast</h5>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-secondary active" data-view="chart">
+                        <i class="fas fa-chart-line"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" data-view="table">
+                        <i class="fas fa-table"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Loading indicator -->
+                <div id="forecast-loading" class="text-center py-5">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Generating forecast...</p>
+                </div>
+                
+                <!-- Chart view -->
+                <div id="forecast-chart-view" class="h-100" style="display:none;">
+                    <div class="chart-container h-100">
+                        <canvas id="forecast-chart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Table view -->
+                <div id="forecast-table-view" style="display:none;">
+                    <div class="table-responsive">
+                        <table class="table table-borderless table-grid">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Forecast (MW)</th>
+                                    <th>Lower Bound</th>
+                                    <th>Upper Bound</th>
+                                    <th>Confidence</th>
+                                </tr>
+                            </thead>
+                            <tbody id="forecast-table-body">
+                                <!-- Will be populated with forecast data -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- No data view -->
+                <div id="forecast-no-data" class="text-center py-5">
+                    <div class="text-secondary mb-3">
+                        <i class="fas fa-chart-line fa-3x"></i>
+                    </div>
+                    <h5>No Forecast Data</h5>
+                    <p class="text-secondary">
+                        Use the form on the left to generate a power demand forecast.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-list-alt me-2"></i> Forecast Details</h5>
+            </div>
+            <div class="card-body">
+                <!-- Will be filled with forecast cards -->
+                <div id="forecast-details-container">
+                    <div class="text-center py-5 text-secondary">
+                        <p>Generate a forecast to see detailed predictions for each day.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Forecast Help Modal -->
+<div class="modal fade" id="forecastHelpModal" tabindex="-1" aria-labelledby="forecastHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="forecastHelpModalLabel">How Forecasting Works</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6>About the Forecasting Model</h6>
+                <p>
+                    The power demand forecasting system uses machine learning to predict future electricity demand.
+                    Here's how it works:
+                </p>
+                
+                <ol>
+                    <li><strong>Data Collection:</strong> Historical power consumption data is collected from the Central Electricity Authority.</li>
+                    <li><strong>Feature Engineering:</strong> The system extracts patterns related to:
+                        <ul>
+                            <li>Day of week patterns (weekday vs weekend consumption)</li>
+                            <li>Seasonal trends</li>
+                            <li>Recent consumption patterns</li>
+                            <li>Historical demand at similar times</li>
+                        </ul>
+                    </li>
+                    <li><strong>Model Training:</strong> A Random Forest regression model is trained on historical data.</li>
+                    <li><strong>Prediction:</strong> The model generates forecasts for future days with confidence intervals.</li>
+                </ol>
+                
+                <h6>Understanding the Forecast</h6>
+                <p>
+                    Each forecast includes:
+                </p>
+                <ul>
+                    <li><strong>Predicted Demand:</strong> The expected power consumption in megawatts (MW).</li>
+                    <li><strong>Uncertainty Range:</strong> The lower and upper bounds of the prediction (95% confidence interval).</li>
+                    <li><strong>Confidence Level:</strong> How certain the model is about its prediction.</li>
+                </ul>
+                
+                <h6>Factors that Affect Accuracy</h6>
+                <ul>
+                    <li>Unusual weather events</li>
+                    <li>Unexpected holidays or events</li>
+                    <li>Economic disruptions</li>
+                    <li>Technical outages</li>
+                </ul>
+                
+                <p>
+                    The model continuously improves as more data becomes available.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize
+    let forecastChart = null;
+    let currentForecastData = null;
+    
+    // Initialize view
+    showView('no-data');
+    
+    // Set up form submission
+    document.getElementById('forecast-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        generateForecast();
+    });
+    
+    // Toggle between chart and table views
+    document.querySelectorAll('[data-view]').forEach(button => {
+        button.addEventListener('click', function() {
+            const view = this.getAttribute('data-view');
+            
+            // Update active button
+            document.querySelectorAll('[data-view]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            this.classList.add('active');
+            
+            // Show the selected view
+            if (view === 'chart') {
+                document.getElementById('forecast-chart-view').style.display = 'block';
+                document.getElementById('forecast-table-view').style.display = 'none';
+            } else {
+                document.getElementById('forecast-chart-view').style.display = 'none';
+                document.getElementById('forecast-table-view').style.display = 'block';
+            }
+        });
+    });
+    
+    // Toggle confidence interval display
+    document.getElementById('show-confidence').addEventListener('change', function() {
+        if (forecastChart) {
+            forecastChart.data.datasets[1].hidden = !this.checked;
+            forecastChart.data.datasets[2].hidden = !this.checked;
+            forecastChart.update();
+        }
+    });
+    
+    function generateForecast() {
+        // Get form values
+        const region = document.getElementById('forecast-region').value;
+        const days = document.getElementById('forecast-days').value;
+        
+        // Show loading
+        showView('loading');
+        
+        // Prepare data for API request
+        const formData = new FormData();
+        formData.append('region', region);
+        formData.append('days', days);
+        
+        // Make API request
+        fetch('/api/forecast-demand', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Store forecast data
+                currentForecastData = data.forecast;
+                
+                // Update UI with forecast data
+                updateForecastUI(data.forecast);
+                
+                // Show chart view
+                showView('chart');
+                
+                // Update model accuracy if available
+                if (data.model_info && data.model_info.validation_score) {
+                    document.getElementById('model-accuracy').textContent = 
+                        (data.model_info.validation_score * 100).toFixed(1) + '%';
+                }
+            } else {
+                console.error('Error generating forecast:', data.error);
+                alert('Error generating forecast: ' + data.error);
+                showView('no-data');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching forecast data:', error);
+            alert('Error fetching forecast data. Please try again.');
+            showView('no-data');
+        });
+    }
+    
+    function updateForecastUI(forecastData) {
+        // Prepare data for chart
+        const dates = forecastData.map(item => formatDate(item.date));
+        const predictions = forecastData.map(item => item.predicted_demand);
+        const lowerBounds = forecastData.map(item => item.lower_bound);
+        const upperBounds = forecastData.map(item => item.upper_bound);
+        
+        // Create or update chart
+        updateForecastChart(dates, predictions, lowerBounds, upperBounds);
+        
+        // Update table
+        updateForecastTable(forecastData);
+        
+        // Update detail cards
+        updateForecastDetails(forecastData);
+    }
+    
+    function updateForecastChart(dates, predictions, lowerBounds, upperBounds) {
+        const ctx = document.getElementById('forecast-chart').getContext('2d');
+        
+        // Destroy existing chart if it exists
+        if (forecastChart) {
+            forecastChart.destroy();
+        }
+        
+        // Create chart
+        forecastChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [
+                    {
+                        label: 'Power Demand (MW)',
+                        data: predictions,
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'transparent',
+                        borderWidth: 3,
+                        tension: 0.1,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Upper Bound',
+                        data: upperBounds,
+                        borderColor: 'rgba(13, 110, 253, 0.3)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    },
+                    {
+                        label: 'Lower Bound',
+                        data: lowerBounds,
+                        borderColor: 'rgba(13, 110, 253, 0.3)',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: '+1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#adb5bd'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                            color: '#adb5bd',
+                            callback: function(value) {
+                                return formatNumber(value);
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#f8f9fa',
+                            filter: function(legendItem, chartData) {
+                                // Hide bounds from legend
+                                return legendItem.text === 'Power Demand (MW)';
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                return context.dataset.label + ': ' + formatNumber(value) + ' MW';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Apply confidence interval visibility setting
+        const showConfidence = document.getElementById('show-confidence').checked;
+        forecastChart.data.datasets[1].hidden = !showConfidence;
+        forecastChart.data.datasets[2].hidden = !showConfidence;
+        forecastChart.update();
+    }
+    
+    function updateForecastTable(forecastData) {
+        const tableBody = document.getElementById('forecast-table-body');
+        tableBody.innerHTML = '';
+        
+        forecastData.forEach(forecast => {
+            const row = document.createElement('tr');
+            
+            // Calculate confidence range as percentage of predicted value
+            const range = forecast.upper_bound - forecast.lower_bound;
+            const confidence = 100 - (range / forecast.predicted_demand * 100 / 2);
+            
+            row.innerHTML = `
+                <td>${formatDate(forecast.date)}</td>
+                <td>${formatNumber(forecast.predicted_demand)} MW</td>
+                <td>${formatNumber(forecast.lower_bound)} MW</td>
+                <td>${formatNumber(forecast.upper_bound)} MW</td>
+                <td>
+                    <div class="progress bg-dark">
+                        <div class="progress-bar bg-success" 
+                            role="progressbar" 
+                            style="width: ${confidence}%"
+                            aria-valuenow="${confidence}" 
+                            aria-valuemin="0" 
+                            aria-valuemax="100">
+                            ${confidence.toFixed(1)}%
+                        </div>
+                    </div>
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+        });
+    }
+    
+    function updateForecastDetails(forecastData) {
+        const container = document.getElementById('forecast-details-container');
+        container.innerHTML = '';
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        forecastData.forEach(forecast => {
+            const forecastDate = new Date(forecast.date);
+            const isToday = forecastDate.toDateString() === today.toDateString();
+            const isTomorrow = new Date(today.getTime() + 86400000).toDateString() === forecastDate.toDateString();
+            
+            // Calculate percentage difference from average
+            const avgDemand = forecastData.reduce((sum, item) => sum + item.predicted_demand, 0) / forecastData.length;
+            const diffFromAvg = ((forecast.predicted_demand - avgDemand) / avgDemand * 100).toFixed(1);
+            const diffClass = diffFromAvg > 0 ? 'text-danger' : 'text-success';
+            
+            // Card for this forecast day
+            const card = document.createElement('div');
+            card.className = `dashboard-card forecast-card ${isToday ? 'today' : 'future'}`;
+            
+            // Format date with day name
+            const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const formattedDate = forecastDate.toLocaleDateString('en-US', dateOptions);
+            
+            card.innerHTML = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <h5>
+                            ${isToday ? 'Today' : (isTomorrow ? 'Tomorrow' : formattedDate)}
+                            ${isToday ? `<span class="badge bg-primary ms-2">Today</span>` : ''}
+                        </h5>
+                        <p class="text-secondary">${formattedDate}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h3 mb-0">${formatNumber(forecast.predicted_demand)}</div>
+                            <div class="small text-secondary">Megawatts (MW)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h5 mb-0">${formatNumber(forecast.lower_bound)} - ${formatNumber(forecast.upper_bound)}</div>
+                            <div class="small text-secondary">Prediction Range (MW)</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h5 mb-0 ${diffClass}">
+                                ${diffFromAvg > 0 ? '+' : ''}${diffFromAvg}%
+                                <i class="fas fa-${diffFromAvg > 0 ? 'arrow-up' : 'arrow-down'} small ms-1"></i>
+                            </div>
+                            <div class="small text-secondary">Compared to Average</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(card);
+        });
+    }
+    
+    function showView(view) {
+        // Hide all views
+        document.getElementById('forecast-loading').style.display = 'none';
+        document.getElementById('forecast-chart-view').style.display = 'none';
+        document.getElementById('forecast-table-view').style.display = 'none';
+        document.getElementById('forecast-no-data').style.display = 'none';
+        
+        // Show the requested view
+        switch (view) {
+            case 'loading':
+                document.getElementById('forecast-loading').style.display = 'block';
+                break;
+            case 'chart':
+                document.getElementById('forecast-chart-view').style.display = 'block';
+                break;
+            case 'table':
+                document.getElementById('forecast-table-view').style.display = 'block';
+                break;
+            case 'no-data':
+            default:
+                document.getElementById('forecast-no-data').style.display = 'block';
+                break;
+        }
+    }
+    
+    // Helper functions
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    
+    function formatNumber(num) {
+        return new Intl.NumberFormat().format(Math.round(num));
+    }
+});
+</script>
+{% endblock %}

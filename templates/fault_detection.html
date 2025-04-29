@@ -1,0 +1,496 @@
+{% extends "layout.html" %}
+
+{% block additional_head %}
+<style>
+    .fault-card {
+        transition: all 0.2s;
+        border-left: 4px solid transparent;
+    }
+    
+    .fault-card:hover {
+        transform: translateY(-3px);
+    }
+    
+    .fault-card.critical {
+        border-left-color: var(--bs-danger);
+    }
+    
+    .fault-card.high {
+        border-left-color: var(--bs-warning);
+    }
+    
+    .fault-card.medium {
+        border-left-color: var(--bs-info);
+    }
+    
+    .fault-card.low {
+        border-left-color: var(--bs-secondary);
+    }
+    
+    .fault-pulse {
+        animation: fault-pulse 2s infinite;
+    }
+    
+    @keyframes fault-pulse {
+        0% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.5;
+        }
+        100% {
+            opacity: 1;
+        }
+    }
+    
+    #grid-map {
+        min-height: 450px;
+        border-radius: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2><i class="fas fa-exclamation-triangle me-2"></i> Fault Detection</h2>
+        <p class="text-secondary">
+            Detect and analyze potential grid faults and anomalies
+        </p>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <div class="btn-group" role="group" aria-label="Fault Controls">
+            <button type="button" class="btn btn-outline-secondary" id="refresh-faults-btn">
+                <i class="fas fa-sync-alt me-1"></i> Refresh Data
+            </button>
+            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#faultHelpModal">
+                <i class="fas fa-question-circle me-1"></i> Help
+            </button>
+        </div>
+        <div class="mt-2 text-secondary">
+            <small id="fault-data-timestamp">Last updated: loading...</small>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4 mb-4">
+        <!-- Fault Summary -->
+        <div class="dashboard-card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i> Fault Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div class="text-center">
+                        <div class="h3 mb-0" id="total-faults-count">0</div>
+                        <div class="small text-secondary">Total Faults</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="h3 mb-0" id="grid-status-indicator">
+                            <span class="badge bg-success">Stable</span>
+                        </div>
+                        <div class="small text-secondary">Grid Status</div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Critical Faults</span>
+                        <span class="badge bg-danger" id="critical-count">0</span>
+                    </div>
+                    <div class="progress bg-dark mb-2">
+                        <div class="progress-bar bg-danger" role="progressbar" style="width: 0%" id="critical-bar"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>High Severity</span>
+                        <span class="badge bg-warning" id="high-count">0</span>
+                    </div>
+                    <div class="progress bg-dark mb-2">
+                        <div class="progress-bar bg-warning" role="progressbar" style="width: 0%" id="high-bar"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Medium Severity</span>
+                        <span class="badge bg-info" id="medium-count">0</span>
+                    </div>
+                    <div class="progress bg-dark mb-2">
+                        <div class="progress-bar bg-info" role="progressbar" style="width: 0%" id="medium-bar"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Low Severity</span>
+                        <span class="badge bg-secondary" id="low-count">0</span>
+                    </div>
+                    <div class="progress bg-dark mb-2">
+                        <div class="progress-bar bg-secondary" role="progressbar" style="width: 0%" id="low-bar"></div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="small text-secondary mb-1">Most Common Issue</div>
+                        <div id="common-issue">None</div>
+                    </div>
+                    <div>
+                        <div class="small text-secondary mb-1">Most Affected Region</div>
+                        <div id="affected-region">None</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8 mb-4">
+        <!-- Grid Map -->
+        <div class="dashboard-card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-map-marked-alt me-2"></i> Grid Fault Map</h5>
+            </div>
+            <div class="card-body p-0">
+                <div id="grid-map"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fault List -->
+<div class="row">
+    <div class="col-12">
+        <div class="dashboard-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i> Detected Faults</h5>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-secondary active" data-filter="all">All</button>
+                    <button type="button" class="btn btn-outline-danger" data-filter="critical">Critical</button>
+                    <button type="button" class="btn btn-outline-warning" data-filter="high">High</button>
+                    <button type="button" class="btn btn-outline-info" data-filter="medium">Medium</button>
+                    <button type="button" class="btn btn-outline-secondary" data-filter="low">Low</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="faults-container" class="row">
+                    <!-- Will be filled with fault cards -->
+                    <div class="col-12 text-center py-5">
+                        <div class="spinner-border text-secondary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-secondary">Loading fault data...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fault Help Modal -->
+<div class="modal fade" id="faultHelpModal" tabindex="-1" aria-labelledby="faultHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="faultHelpModalLabel">Fault Detection Help</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6>About Fault Detection</h6>
+                <p>
+                    The fault detection system monitors the electrical grid for abnormal conditions and potential issues.
+                    It helps grid operators identify and address problems before they cause widespread outages.
+                </p>
+                
+                <h6>Types of Detected Faults</h6>
+                <ul>
+                    <li><strong>Frequency Deviation:</strong> Grid frequency outside normal operating range (49.7-50.3 Hz).</li>
+                    <li><strong>High Load:</strong> Regions or substations experiencing load levels approaching capacity limits.</li>
+                    <li><strong>Voltage Fluctuation:</strong> Unstable voltage levels that could damage equipment or cause instability.</li>
+                    <li><strong>Line Loading:</strong> Transmission lines carrying loads near their rated capacity.</li>
+                    <li><strong>Substation Issues:</strong> Problems detected at specific substations.</li>
+                </ul>
+                
+                <h6>Severity Levels</h6>
+                <ul>
+                    <li><strong>Critical:</strong> Requires immediate attention. High risk of cascading failures or outages.</li>
+                    <li><strong>High:</strong> Significant issue that should be addressed promptly.</li>
+                    <li><strong>Medium:</strong> Moderate issue that should be monitored closely.</li>
+                    <li><strong>Low:</strong> Minor issue that should be logged but may not require immediate action.</li>
+                </ul>
+                
+                <h6>Interpreting the Map</h6>
+                <p>
+                    The grid fault map shows the geographical distribution of detected issues:
+                </p>
+                <ul>
+                    <li>Red markers indicate critical faults</li>
+                    <li>Orange markers indicate high severity issues</li>
+                    <li>Blue markers indicate medium severity issues</li>
+                    <li>Gray markers indicate low severity issues</li>
+                </ul>
+                <p>
+                    Click on any marker to see detailed information about the fault.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Load map specific JS -->
+<script src="{{ url_for('static', filename='js/map.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize
+    loadFaultData();
+    
+    // Set up refresh button
+    document.getElementById('refresh-faults-btn').addEventListener('click', function() {
+        loadFaultData();
+    });
+    
+    // Set up fault filters
+    document.querySelectorAll('[data-filter]').forEach(button => {
+        button.addEventListener('click', function() {
+            const filter = this.getAttribute('data-filter');
+            
+            // Update active button
+            document.querySelectorAll('[data-filter]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            this.classList.add('active');
+            
+            // Apply filter
+            filterFaults(filter);
+        });
+    });
+    
+    function loadFaultData() {
+        fetch('/api/detect-faults')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    updateFaultUI(data.faults);
+                    updateFaultSummary(data.faults);
+                } else {
+                    console.error('Error loading fault data:', data.error);
+                    displayError('Error loading fault data: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching fault data:', error);
+                displayError('Failed to fetch fault data. Please check your connection.');
+            });
+            
+        // Update timestamp
+        document.getElementById('fault-data-timestamp').textContent = 
+            'Last updated: ' + new Date().toLocaleTimeString();
+    }
+    
+    function updateFaultUI(faults) {
+        const container = document.getElementById('faults-container');
+        container.innerHTML = '';
+        
+        if (faults.length === 0) {
+            container.innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-success">
+                        <i class="fa fa-check-circle me-2"></i> No faults detected in the system.
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        // Sort faults by severity
+        const severityOrder = {
+            'critical': 0,
+            'high': 1,
+            'medium': 2,
+            'low': 3
+        };
+        
+        faults.sort((a, b) => {
+            return severityOrder[a.severity] - severityOrder[b.severity];
+        });
+        
+        // Add fault cards
+        faults.forEach(fault => {
+            const col = document.createElement('div');
+            col.className = 'col-md-6 mb-3 fault-item ' + fault.severity;
+            
+            const faultTime = new Date(fault.timestamp).toLocaleTimeString();
+            const severityClass = getSeverityClass(fault.severity);
+            const isPulsing = fault.severity === 'critical' ? 'fault-pulse' : '';
+            
+            col.innerHTML = `
+                <div class="dashboard-card fault-card ${fault.severity} h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title ${severityClass.text} ${isPulsing}">
+                                <i class="fa fa-exclamation-triangle me-2"></i>
+                                ${formatFaultType(fault.type)}
+                            </h5>
+                            <span class="badge ${severityClass.bg}">${fault.severity.toUpperCase()}</span>
+                        </div>
+                        <p class="card-text">${fault.description}</p>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <div class="small text-secondary mb-1">Location</div>
+                                <div class="text-capitalize">
+                                    ${fault.region || 'System'} 
+                                    ${fault.substation ? '- ' + fault.substation : ''}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="small text-secondary mb-1">Detected</div>
+                                <div>${faultTime}</div>
+                            </div>
+                        </div>
+                        ${fault.value ? `
+                        <div class="mt-3">
+                            <div class="small text-secondary mb-1">Value</div>
+                            <div>${fault.value} ${fault.threshold ? '(Threshold: ' + fault.threshold + ')' : ''}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(col);
+        });
+    }
+    
+    function updateFaultSummary(faults) {
+        // Count by severity
+        const countBySeverity = {
+            critical: 0,
+            high: 0,
+            medium: 0,
+            low: 0
+        };
+        
+        // Count by type and region
+        const countByType = {};
+        const countByRegion = {};
+        
+        faults.forEach(fault => {
+            // Count by severity
+            countBySeverity[fault.severity] = (countBySeverity[fault.severity] || 0) + 1;
+            
+            // Count by type
+            const type = formatFaultType(fault.type);
+            countByType[type] = (countByType[type] || 0) + 1;
+            
+            // Count by region
+            if (fault.region) {
+                const region = fault.region.charAt(0).toUpperCase() + fault.region.slice(1);
+                countByRegion[region] = (countByRegion[region] || 0) + 1;
+            }
+        });
+        
+        // Update counts
+        document.getElementById('total-faults-count').textContent = faults.length;
+        document.getElementById('critical-count').textContent = countBySeverity.critical;
+        document.getElementById('high-count').textContent = countBySeverity.high;
+        document.getElementById('medium-count').textContent = countBySeverity.medium;
+        document.getElementById('low-count').textContent = countBySeverity.low;
+        
+        // Update progress bars
+        const totalFaults = faults.length || 1; // Avoid division by zero
+        document.getElementById('critical-bar').style.width = (countBySeverity.critical / totalFaults * 100) + '%';
+        document.getElementById('high-bar').style.width = (countBySeverity.high / totalFaults * 100) + '%';
+        document.getElementById('medium-bar').style.width = (countBySeverity.medium / totalFaults * 100) + '%';
+        document.getElementById('low-bar').style.width = (countBySeverity.low / totalFaults * 100) + '%';
+        
+        // Update grid status
+        if (countBySeverity.critical > 0) {
+            document.getElementById('grid-status-indicator').innerHTML = '<span class="badge bg-danger">Critical</span>';
+        } else if (countBySeverity.high > 0) {
+            document.getElementById('grid-status-indicator').innerHTML = '<span class="badge bg-warning">Warning</span>';
+        } else if (countBySeverity.medium > 0) {
+            document.getElementById('grid-status-indicator').innerHTML = '<span class="badge bg-info">Alert</span>';
+        } else {
+            document.getElementById('grid-status-indicator').innerHTML = '<span class="badge bg-success">Stable</span>';
+        }
+        
+        // Update most common issue
+        let mostCommonIssue = { type: 'None', count: 0 };
+        Object.entries(countByType).forEach(([type, count]) => {
+            if (count > mostCommonIssue.count) {
+                mostCommonIssue = { type, count };
+            }
+        });
+        document.getElementById('common-issue').textContent = mostCommonIssue.type;
+        
+        // Update most affected region
+        let mostAffectedRegion = { region: 'None', count: 0 };
+        Object.entries(countByRegion).forEach(([region, count]) => {
+            if (count > mostAffectedRegion.count) {
+                mostAffectedRegion = { region, count };
+            }
+        });
+        document.getElementById('affected-region').textContent = mostAffectedRegion.region;
+    }
+    
+    function filterFaults(filter) {
+        document.querySelectorAll('.fault-item').forEach(item => {
+            if (filter === 'all' || item.classList.contains(filter)) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+    
+    function getSeverityClass(severity) {
+        switch (severity) {
+            case 'critical':
+                return {bg: 'bg-danger', text: 'text-danger'};
+            case 'high':
+                return {bg: 'bg-warning', text: 'text-warning'};
+            case 'medium':
+                return {bg: 'bg-info', text: 'text-info'};
+            case 'low':
+            default:
+                return {bg: 'bg-secondary', text: 'text-secondary'};
+        }
+    }
+    
+    function formatFaultType(type) {
+        if (!type) return 'Unknown Issue';
+        
+        // Replace underscores with spaces and capitalize
+        return type.split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+    }
+    
+    function displayError(message) {
+        const container = document.getElementById('faults-container');
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-danger">
+                    <i class="fa fa-exclamation-circle me-2"></i> ${message}
+                </div>
+            </div>
+        `;
+    }
+});
+</script>
+{% endblock %}

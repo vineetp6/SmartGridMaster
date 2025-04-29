@@ -1,0 +1,736 @@
+{% extends "layout.html" %}
+
+{% block additional_head %}
+<style>
+    .transfer-arrow {
+        position: relative;
+        padding: 10px;
+        text-align: center;
+    }
+    
+    .transfer-arrow i {
+        font-size: 2rem;
+    }
+    
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    
+    .scenario-card {
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .scenario-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+    
+    .scenario-card.active {
+        border-color: var(--bs-primary);
+        background-color: rgba(13, 110, 253, 0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2><i class="fas fa-balance-scale me-2"></i> Load Balancing Simulation</h2>
+        <p class="text-secondary">
+            Simulate power transfer between regions to balance load and maintain grid stability
+        </p>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#loadBalancingHelpModal">
+            <i class="fas fa-question-circle me-1"></i> How It Works
+        </button>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <!-- Simulation Controls -->
+        <div class="dashboard-card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-sliders-h me-2"></i> Simulation Parameters</h5>
+            </div>
+            <div class="card-body">
+                <form id="simulation-form">
+                    <div class="mb-4">
+                        <label class="form-label">Scenario</label>
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="scenario-card dashboard-card p-3 text-center active" data-scenario="normal">
+                                    <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                                    <div>Normal</div>
+                                    <small class="text-secondary">Standard conditions</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="scenario-card dashboard-card p-3 text-center" data-scenario="peak">
+                                    <i class="fas fa-bolt fa-2x text-warning mb-2"></i>
+                                    <div>Peak Demand</div>
+                                    <small class="text-secondary">High consumption</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="scenario-card dashboard-card p-3 text-center" data-scenario="renewable_surplus">
+                                    <i class="fas fa-sun fa-2x text-warning mb-2"></i>
+                                    <div>Renewable Surplus</div>
+                                    <small class="text-secondary">Excess generation</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="scenario-card dashboard-card p-3 text-center" data-scenario="outage">
+                                    <i class="fas fa-exclamation-triangle fa-2x text-danger mb-2"></i>
+                                    <div>Generation Outage</div>
+                                    <small class="text-secondary">Critical situation</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Regions to Include</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="northern" id="region-northern" checked>
+                            <label class="form-check-label" for="region-northern">
+                                Northern
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="western" id="region-western" checked>
+                            <label class="form-check-label" for="region-western">
+                                Western
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="southern" id="region-southern" checked>
+                            <label class="form-check-label" for="region-southern">
+                                Southern
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="eastern" id="region-eastern" checked>
+                            <label class="form-check-label" for="region-eastern">
+                                Eastern
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="northeastern" id="region-northeastern" checked>
+                            <label class="form-check-label" for="region-northeastern">
+                                Northeastern
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary" id="run-simulation-btn">
+                            <i class="fas fa-play me-2"></i> Run Simulation
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <!-- Simulation Results -->
+        <div class="dashboard-card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i> Simulation Results</h5>
+            </div>
+            <div class="card-body">
+                <!-- Loading indicator -->
+                <div id="simulation-loading" class="text-center py-5" style="display:none;">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Running simulation...</p>
+                </div>
+                
+                <!-- Results view -->
+                <div id="simulation-results" style="display:none;">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-3">
+                                <h6 class="text-secondary mb-3">Imbalance Before Optimization</h6>
+                                <div class="h3 mb-0" id="initial-imbalance">0 MW</div>
+                                <div class="mb-3 small">Total system imbalance</div>
+                                
+                                <div class="progress bg-dark mb-2">
+                                    <div class="progress-bar bg-danger" role="progressbar" style="width: 100%" id="imbalance-before-bar"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="dashboard-card p-3">
+                                <h6 class="text-secondary mb-3">Imbalance After Optimization</h6>
+                                <div class="h3 mb-0" id="final-imbalance">0 MW</div>
+                                <div class="mb-3 small">Remaining system imbalance</div>
+                                
+                                <div class="progress bg-dark mb-2">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: 0%" id="imbalance-after-bar"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="dashboard-card p-3 text-center">
+                                <div class="text-secondary mb-2">Improvement</div>
+                                <div class="h4 mb-0" id="improvement-percentage">0%</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="dashboard-card p-3 text-center">
+                                <div class="text-secondary mb-2">Transfers</div>
+                                <div class="h4 mb-0" id="transfers-count">0</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="dashboard-card p-3 text-center">
+                                <div class="text-secondary mb-2">Power Transferred</div>
+                                <div class="h4 mb-0" id="power-transferred">0 MW</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h5 class="mb-3">Power Transfers</h5>
+                    <div class="table-responsive">
+                        <table class="table table-borderless table-grid">
+                            <thead>
+                                <tr>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transfers-table-body">
+                                <!-- Will be populated with transfers data -->
+                                <tr>
+                                    <td colspan="4" class="text-center text-secondary">No transfers data available</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- No data view -->
+                <div id="simulation-no-data" class="text-center py-5">
+                    <div class="text-secondary mb-3">
+                        <i class="fas fa-balance-scale fa-3x"></i>
+                    </div>
+                    <h5>No Simulation Results</h5>
+                    <p class="text-secondary">
+                        Use the form on the left to run a load balancing simulation.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <!-- Regional Status -->
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-map-marked-alt me-2"></i> Regional Status</h5>
+            </div>
+            <div class="card-body">
+                <!-- Loading indicator -->
+                <div id="regional-loading" class="text-center py-5" style="display:none;">
+                    <div class="spinner-border text-secondary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                
+                <!-- Regional data -->
+                <div id="regional-data" style="display:none;">
+                    <div class="mb-4">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary active" data-view="before">Before Balancing</button>
+                            <button type="button" class="btn btn-outline-secondary" data-view="after">After Balancing</button>
+                            <button type="button" class="btn btn-outline-secondary" data-view="comparison">Comparison</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Before balancing view -->
+                    <div id="before-balance-view">
+                        <div class="table-responsive">
+                            <table class="table table-borderless table-grid">
+                                <thead>
+                                    <tr>
+                                        <th>Region</th>
+                                        <th>Generation (MW)</th>
+                                        <th>Consumption (MW)</th>
+                                        <th>Balance (MW)</th>
+                                        <th>Frequency (Hz)</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="region-before-body">
+                                    <!-- Will be populated with region data -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- After balancing view -->
+                    <div id="after-balance-view" style="display:none;">
+                        <div class="table-responsive">
+                            <table class="table table-borderless table-grid">
+                                <thead>
+                                    <tr>
+                                        <th>Region</th>
+                                        <th>Generation (MW)</th>
+                                        <th>Consumption (MW)</th>
+                                        <th>Balance (MW)</th>
+                                        <th>Frequency (Hz)</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="region-after-body">
+                                    <!-- Will be populated with region data -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Comparison view -->
+                    <div id="comparison-view" style="display:none;">
+                        <div class="table-responsive">
+                            <table class="table table-borderless table-grid">
+                                <thead>
+                                    <tr>
+                                        <th>Region</th>
+                                        <th>Initial Balance (MW)</th>
+                                        <th>Final Balance (MW)</th>
+                                        <th>Change</th>
+                                        <th>Frequency Change</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="region-comparison-body">
+                                    <!-- Will be populated with comparison data -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- No data view -->
+                <div id="regional-no-data" class="text-center py-4">
+                    <p class="text-secondary">Run a simulation to see regional data.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Load Balancing Help Modal -->
+<div class="modal fade" id="loadBalancingHelpModal" tabindex="-1" aria-labelledby="loadBalancingHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="loadBalancingHelpModalLabel">How Load Balancing Works</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6>About Load Balancing</h6>
+                <p>
+                    Load balancing is the process of distributing power between different regions of the electrical grid
+                    to maintain stability and efficiency. It helps to:
+                </p>
+                <ul>
+                    <li>Prevent overloading of transmission lines</li>
+                    <li>Maintain frequency stability across the grid</li>
+                    <li>Efficiently utilize power generation resources</li>
+                    <li>Respond to unexpected demand changes or generation outages</li>
+                </ul>
+                
+                <h6>Simulation Scenarios</h6>
+                <ul>
+                    <li><strong>Normal:</strong> Standard operating conditions with typical generation and consumption patterns.</li>
+                    <li><strong>Peak Demand:</strong> Increased consumption across regions, simulating peak hours or extreme weather conditions.</li>
+                    <li><strong>Renewable Surplus:</strong> Excess generation in some regions due to favorable conditions for renewable energy.</li>
+                    <li><strong>Generation Outage:</strong> Sudden loss of generation capacity in one region, requiring emergency balancing.</li>
+                </ul>
+                
+                <h6>How the Simulation Works</h6>
+                <ol>
+                    <li>The system analyzes the initial balance in each region (generation minus consumption).</li>
+                    <li>It identifies surplus regions (positive balance) and deficit regions (negative balance).</li>
+                    <li>The algorithm optimally transfers power from surplus to deficit regions.</li>
+                    <li>Transfers are limited by inter-regional transmission capacity.</li>
+                    <li>The system recalculates regional balances and estimates frequency changes.</li>
+                </ol>
+                
+                <p>
+                    In a real power grid, this process happens continuously through automatic generation control systems
+                    and is coordinated by grid operators.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let currentScenario = 'normal';
+    let simulationResult = null;
+    
+    // Initialize view
+    showSimulationView('no-data');
+    showRegionalView('no-data');
+    
+    // Set up scenario selection
+    document.querySelectorAll('.scenario-card').forEach(card => {
+        card.addEventListener('click', function() {
+            // Update active state
+            document.querySelectorAll('.scenario-card').forEach(c => {
+                c.classList.remove('active');
+            });
+            this.classList.add('active');
+            
+            // Store selected scenario
+            currentScenario = this.getAttribute('data-scenario');
+        });
+    });
+    
+    // Set up form submission
+    document.getElementById('simulation-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        runSimulation();
+    });
+    
+    // Toggle between regional views
+    document.querySelectorAll('[data-view]').forEach(button => {
+        button.addEventListener('click', function() {
+            const view = this.getAttribute('data-view');
+            
+            // Update active button
+            document.querySelectorAll('[data-view]').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            this.classList.add('active');
+            
+            // Hide all views
+            document.getElementById('before-balance-view').style.display = 'none';
+            document.getElementById('after-balance-view').style.display = 'none';
+            document.getElementById('comparison-view').style.display = 'none';
+            
+            // Show the selected view
+            if (view === 'before') {
+                document.getElementById('before-balance-view').style.display = 'block';
+            } else if (view === 'after') {
+                document.getElementById('after-balance-view').style.display = 'block';
+            } else if (view === 'comparison') {
+                document.getElementById('comparison-view').style.display = 'block';
+            }
+        });
+    });
+    
+    function runSimulation() {
+        // Get selected regions
+        const regions = [];
+        document.querySelectorAll('input[type=checkbox]:checked').forEach(checkbox => {
+            regions.push(checkbox.value);
+        });
+        
+        if (regions.length < 2) {
+            alert('Please select at least two regions for the simulation.');
+            return;
+        }
+        
+        // Show loading state
+        showSimulationView('loading');
+        showRegionalView('loading');
+        
+        // Prepare request data
+        const requestData = {
+            scenario: currentScenario,
+            regions: regions
+        };
+        
+        // Make API request
+        fetch('/api/simulate-balancing', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Store result
+                simulationResult = data.result;
+                
+                // Update UI
+                updateSimulationResults(data.result);
+                updateRegionalData(data.result);
+                
+                // Show results
+                showSimulationView('results');
+                showRegionalView('data');
+            } else {
+                console.error('Error running simulation:', data.error);
+                alert('Error running simulation: ' + data.error);
+                showSimulationView('no-data');
+                showRegionalView('no-data');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching simulation data:', error);
+            alert('Error fetching simulation data. Please try again.');
+            showSimulationView('no-data');
+            showRegionalView('no-data');
+        });
+    }
+    
+    function updateSimulationResults(result) {
+        // Update metrics
+        document.getElementById('initial-imbalance').textContent = formatNumber(Math.abs(result.metrics.initial_imbalance)) + ' MW';
+        document.getElementById('final-imbalance').textContent = formatNumber(Math.abs(result.metrics.remaining_imbalance)) + ' MW';
+        document.getElementById('improvement-percentage').textContent = result.metrics.improvement_percentage + '%';
+        document.getElementById('transfers-count').textContent = result.metrics.transfers_count;
+        document.getElementById('power-transferred').textContent = formatNumber(result.metrics.total_power_transferred) + ' MW';
+        
+        // Update progress bars
+        const maxImbalance = Math.max(Math.abs(result.metrics.initial_imbalance), Math.abs(result.metrics.remaining_imbalance));
+        const initialWidth = (Math.abs(result.metrics.initial_imbalance) / maxImbalance * 100) + '%';
+        const finalWidth = (Math.abs(result.metrics.remaining_imbalance) / maxImbalance * 100) + '%';
+        
+        document.getElementById('imbalance-before-bar').style.width = initialWidth;
+        document.getElementById('imbalance-after-bar').style.width = finalWidth;
+        
+        // Update transfers table
+        const transfersBody = document.getElementById('transfers-table-body');
+        transfersBody.innerHTML = '';
+        
+        if (result.balancing_actions.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td colspan="4" class="text-center text-secondary">No transfers needed or possible</td>
+            `;
+            transfersBody.appendChild(row);
+        } else {
+            result.balancing_actions.forEach(transfer => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="text-capitalize">${transfer.source}</td>
+                    <td class="text-capitalize">${transfer.target}</td>
+                    <td>${formatNumber(transfer.amount)} MW</td>
+                    <td><span class="badge bg-success">Completed</span></td>
+                `;
+                transfersBody.appendChild(row);
+            });
+        }
+    }
+    
+    function updateRegionalData(result) {
+        // Update "Before" table
+        const beforeBody = document.getElementById('region-before-body');
+        beforeBody.innerHTML = '';
+        
+        Object.entries(result.initial_status).forEach(([region, data]) => {
+            const row = document.createElement('tr');
+            
+            // Determine status based on balance
+            let statusClass, statusText;
+            if (data.balance > 1000) {
+                statusClass = 'bg-success';
+                statusText = 'Surplus';
+            } else if (data.balance < -1000) {
+                statusClass = 'bg-danger';
+                statusText = 'Deficit';
+            } else {
+                statusClass = 'bg-secondary';
+                statusText = 'Balanced';
+            }
+            
+            // Determine frequency class
+            let freqClass;
+            if (data.frequency < 49.7 || data.frequency > 50.3) {
+                freqClass = 'text-danger';
+            } else if (data.frequency < 49.85 || data.frequency > 50.15) {
+                freqClass = 'text-warning';
+            } else {
+                freqClass = 'text-success';
+            }
+            
+            row.innerHTML = `
+                <td class="text-capitalize">${region}</td>
+                <td>${formatNumber(data.generation)} MW</td>
+                <td>${formatNumber(data.consumption)} MW</td>
+                <td class="${data.balance >= 0 ? 'text-success' : 'text-danger'}">
+                    ${data.balance > 0 ? '+' : ''}${formatNumber(data.balance)} MW
+                </td>
+                <td class="${freqClass}">${data.frequency.toFixed(2)} Hz</td>
+                <td><span class="badge ${statusClass}">${statusText}</span></td>
+            `;
+            
+            beforeBody.appendChild(row);
+        });
+        
+        // Update "After" table
+        const afterBody = document.getElementById('region-after-body');
+        afterBody.innerHTML = '';
+        
+        Object.entries(result.balanced_status).forEach(([region, data]) => {
+            const row = document.createElement('tr');
+            
+            // Determine status based on balance
+            let statusClass, statusText;
+            if (data.balance > 1000) {
+                statusClass = 'bg-success';
+                statusText = 'Surplus';
+            } else if (data.balance < -1000) {
+                statusClass = 'bg-danger';
+                statusText = 'Deficit';
+            } else {
+                statusClass = 'bg-secondary';
+                statusText = 'Balanced';
+            }
+            
+            // Determine frequency class
+            let freqClass;
+            if (data.frequency < 49.7 || data.frequency > 50.3) {
+                freqClass = 'text-danger';
+            } else if (data.frequency < 49.85 || data.frequency > 50.15) {
+                freqClass = 'text-warning';
+            } else {
+                freqClass = 'text-success';
+            }
+            
+            row.innerHTML = `
+                <td class="text-capitalize">${region}</td>
+                <td>${formatNumber(data.generation)} MW</td>
+                <td>${formatNumber(data.consumption)} MW</td>
+                <td class="${data.balance >= 0 ? 'text-success' : 'text-danger'}">
+                    ${data.balance > 0 ? '+' : ''}${formatNumber(data.balance)} MW
+                </td>
+                <td class="${freqClass}">${data.frequency.toFixed(2)} Hz</td>
+                <td><span class="badge ${statusClass}">${statusText}</span></td>
+            `;
+            
+            afterBody.appendChild(row);
+        });
+        
+        // Update "Comparison" table
+        const comparisonBody = document.getElementById('region-comparison-body');
+        comparisonBody.innerHTML = '';
+        
+        Object.entries(result.initial_status).forEach(([region, initialData]) => {
+            const finalData = result.balanced_status[region];
+            const row = document.createElement('tr');
+            
+            // Calculate change
+            const balanceChange = finalData.balance - initialData.balance;
+            const freqChange = finalData.frequency - initialData.frequency;
+            
+            // Determine change class
+            let changeClass, changePrefix;
+            if (Math.abs(balanceChange) < 100) {
+                changeClass = 'text-secondary';
+                changePrefix = '';
+            } else if (balanceChange > 0) {
+                changeClass = 'text-success';
+                changePrefix = '+';
+            } else {
+                changeClass = 'text-danger';
+                changePrefix = '';
+            }
+            
+            // Determine frequency change class
+            let freqChangeClass, freqChangePrefix;
+            if (Math.abs(freqChange) < 0.01) {
+                freqChangeClass = 'text-secondary';
+                freqChangePrefix = '';
+            } else if (freqChange > 0) {
+                freqChangeClass = 'text-success';
+                freqChangePrefix = '+';
+            } else {
+                freqChangeClass = 'text-danger';
+                freqChangePrefix = '';
+            }
+            
+            row.innerHTML = `
+                <td class="text-capitalize">${region}</td>
+                <td>${initialData.balance > 0 ? '+' : ''}${formatNumber(initialData.balance)} MW</td>
+                <td>${finalData.balance > 0 ? '+' : ''}${formatNumber(finalData.balance)} MW</td>
+                <td class="${changeClass}">
+                    ${changePrefix}${formatNumber(balanceChange)} MW
+                </td>
+                <td class="${freqChangeClass}">
+                    ${freqChangePrefix}${freqChange.toFixed(3)} Hz
+                </td>
+            `;
+            
+            comparisonBody.appendChild(row);
+        });
+    }
+    
+    function showSimulationView(view) {
+        // Hide all views
+        document.getElementById('simulation-loading').style.display = 'none';
+        document.getElementById('simulation-results').style.display = 'none';
+        document.getElementById('simulation-no-data').style.display = 'none';
+        
+        // Show the requested view
+        switch (view) {
+            case 'loading':
+                document.getElementById('simulation-loading').style.display = 'block';
+                break;
+            case 'results':
+                document.getElementById('simulation-results').style.display = 'block';
+                break;
+            case 'no-data':
+            default:
+                document.getElementById('simulation-no-data').style.display = 'block';
+                break;
+        }
+    }
+    
+    function showRegionalView(view) {
+        // Hide all views
+        document.getElementById('regional-loading').style.display = 'none';
+        document.getElementById('regional-data').style.display = 'none';
+        document.getElementById('regional-no-data').style.display = 'none';
+        
+        // Show the requested view
+        switch (view) {
+            case 'loading':
+                document.getElementById('regional-loading').style.display = 'block';
+                break;
+            case 'data':
+                document.getElementById('regional-data').style.display = 'block';
+                break;
+            case 'no-data':
+            default:
+                document.getElementById('regional-no-data').style.display = 'block';
+                break;
+        }
+    }
+    
+    // Helper function to format numbers
+    function formatNumber(num) {
+        return new Intl.NumberFormat().format(Math.round(num));
+    }
+});
+</script>
+{% endblock %}

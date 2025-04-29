@@ -1,0 +1,566 @@
+{% extends "layout.html" %}
+
+{% block additional_head %}
+<style>
+    .capacity-card {
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        transition: all 0.2s;
+        text-align: center;
+    }
+    
+    .capacity-card .icon {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .capacity-card .value {
+        font-size: 1.75rem;
+        font-weight: 500;
+    }
+    
+    .capacity-card .label {
+        font-size: 0.9rem;
+        opacity: 0.7;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .capacity-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .generation-status {
+        padding: 0.3rem 0.75rem;
+        border-radius: 0.25rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .generation-status.high {
+        background-color: rgba(40, 167, 69, 0.2);
+        color: #28a745;
+    }
+    
+    .generation-status.medium {
+        background-color: rgba(255, 193, 7, 0.2);
+        color: #ffc107;
+    }
+    
+    .generation-status.low {
+        background-color: rgba(220, 53, 69, 0.2);
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2><i class="fas fa-leaf me-2"></i> Renewable Energy Sources</h2>
+        <p class="text-secondary">
+            Monitor and analyze renewable energy generation and capacity
+        </p>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <div class="btn-group" role="group" aria-label="Renewable Controls">
+            <button type="button" class="btn btn-outline-secondary" id="refresh-renewable-btn">
+                <i class="fas fa-sync-alt me-1"></i> Refresh Data
+            </button>
+            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#renewableHelpModal">
+                <i class="fas fa-question-circle me-1"></i> Help
+            </button>
+        </div>
+        <div class="mt-2 text-secondary">
+            <small id="renewable-data-timestamp">Last updated: loading...</small>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Renewable Capacity Cards -->
+    <div class="col-md mb-3">
+        <div class="dashboard-card capacity-card">
+            <div class="icon text-warning">
+                <i class="fas fa-sun"></i>
+            </div>
+            <div class="value" id="solar-capacity">...</div>
+            <div class="label">Solar Capacity</div>
+        </div>
+    </div>
+    <div class="col-md mb-3">
+        <div class="dashboard-card capacity-card">
+            <div class="icon text-info">
+                <i class="fas fa-wind"></i>
+            </div>
+            <div class="value" id="wind-capacity">...</div>
+            <div class="label">Wind Capacity</div>
+        </div>
+    </div>
+    <div class="col-md mb-3">
+        <div class="dashboard-card capacity-card">
+            <div class="icon text-primary">
+                <i class="fas fa-water"></i>
+            </div>
+            <div class="value" id="hydro-capacity">...</div>
+            <div class="label">Hydro Capacity</div>
+        </div>
+    </div>
+    <div class="col-md mb-3">
+        <div class="dashboard-card capacity-card">
+            <div class="icon text-success">
+                <i class="fas fa-seedling"></i>
+            </div>
+            <div class="value" id="biomass-capacity">...</div>
+            <div class="label">Biomass Capacity</div>
+        </div>
+    </div>
+    <div class="col-md mb-3">
+        <div class="dashboard-card capacity-card">
+            <div class="icon text-secondary">
+                <i class="fas fa-atom"></i>
+            </div>
+            <div class="value" id="other-capacity">...</div>
+            <div class="label">Other Capacity</div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Current vs Capacity Chart -->
+    <div class="col-md-8 mb-4">
+        <div class="dashboard-card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i> Current Generation vs Capacity</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="renewable-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Total Generation Overview -->
+    <div class="col-md-4 mb-4">
+        <div class="dashboard-card h-100">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-plug me-2"></i> Generation Overview</h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <div class="h2 mb-0" id="total-renewable-generation">...</div>
+                    <div class="text-secondary">Total Renewable Generation</div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Capacity Utilization</span>
+                        <span id="capacity-utilization-text">...</span>
+                    </div>
+                    <div class="progress bg-dark mb-2">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: 0%" id="capacity-utilization-bar"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Contribution to Grid</span>
+                        <span id="grid-contribution-text">...</span>
+                    </div>
+                    <div class="progress bg-dark mb-2">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: 0%" id="grid-contribution-bar"></div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="small text-secondary mb-1">CO₂ Avoided</div>
+                        <div id="co2-avoided">...</div>
+                    </div>
+                    <div>
+                        <div class="small text-secondary mb-1">Highest Generation</div>
+                        <div id="highest-generation">...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Regional Renewable Data -->
+    <div class="col-12">
+        <div class="dashboard-card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-map-marked-alt me-2"></i> Regional Renewable Capacity</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-borderless table-grid">
+                        <thead>
+                            <tr>
+                                <th>Region</th>
+                                <th>Solar (MW)</th>
+                                <th>Wind (MW)</th>
+                                <th>Hydro (MW)</th>
+                                <th>Biomass (MW)</th>
+                                <th>Others (MW)</th>
+                                <th>Total (MW)</th>
+                                <th>Utilization</th>
+                            </tr>
+                        </thead>
+                        <tbody id="renewable-regional-tbody">
+                            <tr>
+                                <td colspan="8" class="text-center">
+                                    <div class="spinner-border text-secondary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2 text-secondary">Loading regional data...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Renewable Help Modal -->
+<div class="modal fade" id="renewableHelpModal" tabindex="-1" aria-labelledby="renewableHelpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="renewableHelpModalLabel">Renewable Energy Sources Help</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6>About Renewable Energy Monitoring</h6>
+                <p>
+                    This dashboard provides real-time monitoring of renewable energy sources across India's power grid.
+                    It shows both installed capacity and current generation for different renewable technologies.
+                </p>
+                
+                <h6>Renewable Energy Sources</h6>
+                <ul>
+                    <li><strong>Solar:</strong> Photovoltaic and concentrated solar power plants.</li>
+                    <li><strong>Wind:</strong> Onshore and offshore wind turbines.</li>
+                    <li><strong>Hydro:</strong> Hydroelectric power plants (typically those under 25 MW capacity are classified as renewable).</li>
+                    <li><strong>Biomass:</strong> Power plants using organic material as fuel, including agricultural waste and dedicated crops.</li>
+                    <li><strong>Others:</strong> Includes geothermal, tidal, wave energy, and other emerging renewable technologies.</li>
+                </ul>
+                
+                <h6>Key Metrics</h6>
+                <ul>
+                    <li><strong>Capacity Utilization:</strong> The percentage of installed capacity currently generating power.</li>
+                    <li><strong>Contribution to Grid:</strong> The percentage of total grid power coming from renewable sources.</li>
+                    <li><strong>CO₂ Avoided:</strong> Estimated carbon emissions avoided by using renewable instead of fossil fuels.</li>
+                </ul>
+                
+                <h6>Factors Affecting Generation</h6>
+                <p>
+                    Renewable energy generation can vary significantly based on:
+                </p>
+                <ul>
+                    <li>Weather conditions (sunshine, wind speed)</li>
+                    <li>Seasonal variations</li>
+                    <li>Time of day</li>
+                    <li>Maintenance schedules</li>
+                    <li>Grid constraints and curtailment</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize
+    let renewableChart = null;
+    loadRenewableData();
+    
+    // Set up refresh button
+    document.getElementById('refresh-renewable-btn').addEventListener('click', function() {
+        loadRenewableData();
+    });
+    
+    function loadRenewableData() {
+        fetch('/api/renewable-data')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    updateRenewableUI(data.data);
+                } else {
+                    console.error('Error loading renewable data:', data.error);
+                    displayError('Error loading renewable data: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching renewable data:', error);
+                displayError('Failed to fetch renewable data. Please check your connection.');
+            });
+            
+        // Also fetch grid data to calculate contribution
+        fetch('/api/grid-data')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Store for use in updateRenewableUI
+                    window.totalGridGeneration = data.data.total_generation;
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching grid data:', error);
+            });
+            
+        // Update timestamp
+        document.getElementById('renewable-data-timestamp').textContent = 
+            'Last updated: ' + new Date().toLocaleTimeString();
+    }
+    
+    function updateRenewableUI(data) {
+        // Update capacity cards
+        document.getElementById('solar-capacity').textContent = formatNumber(data.renewable_capacity.solar) + ' MW';
+        document.getElementById('wind-capacity').textContent = formatNumber(data.renewable_capacity.wind) + ' MW';
+        document.getElementById('hydro-capacity').textContent = formatNumber(data.renewable_capacity.hydro) + ' MW';
+        document.getElementById('biomass-capacity').textContent = formatNumber(data.renewable_capacity.biomass) + ' MW';
+        document.getElementById('other-capacity').textContent = formatNumber(data.renewable_capacity.others) + ' MW';
+        
+        // Calculate totals
+        const totalCapacity = Object.values(data.renewable_capacity).reduce((sum, val) => sum + val, 0);
+        const totalGeneration = Object.values(data.current_generation).reduce((sum, val) => sum + val, 0);
+        
+        // Update total generation
+        document.getElementById('total-renewable-generation').textContent = formatNumber(totalGeneration) + ' MW';
+        
+        // Update capacity utilization
+        const utilizationPercentage = (totalGeneration / totalCapacity * 100).toFixed(1);
+        document.getElementById('capacity-utilization-text').textContent = utilizationPercentage + '%';
+        document.getElementById('capacity-utilization-bar').style.width = utilizationPercentage + '%';
+        
+        // Update grid contribution
+        const totalGridGen = window.totalGridGeneration || 325750; // Fallback if grid data fetch failed
+        const contributionPercentage = (totalGeneration / totalGridGen * 100).toFixed(1);
+        document.getElementById('grid-contribution-text').textContent = contributionPercentage + '%';
+        document.getElementById('grid-contribution-bar').style.width = contributionPercentage + '%';
+        
+        // Update CO2 avoided (rough calculation - 0.7 kg CO2 per kWh from coal)
+        const co2Avoided = totalGeneration * 0.7; // Tonnes per hour
+        document.getElementById('co2-avoided').textContent = formatNumber(co2Avoided) + ' Tonnes/hr';
+        
+        // Determine highest generation source
+        let highestSource = '';
+        let highestValue = 0;
+        Object.entries(data.current_generation).forEach(([source, value]) => {
+            if (value > highestValue) {
+                highestSource = source;
+                highestValue = value;
+            }
+        });
+        
+        // Format highest generation source
+        const formattedSource = highestSource.charAt(0).toUpperCase() + highestSource.slice(1);
+        document.getElementById('highest-generation').textContent = formattedSource;
+        
+        // Update chart
+        updateRenewableChart(data.current_generation, data.renewable_capacity);
+        
+        // Update regional table
+        updateRegionalTable(data.regions);
+    }
+    
+    function updateRenewableChart(currentGen, capacity) {
+        const ctx = document.getElementById('renewable-chart').getContext('2d');
+        
+        // Prepare data
+        const labels = ['Solar', 'Wind', 'Hydro', 'Biomass', 'Others'];
+        const capacityData = [
+            capacity.solar || 0,
+            capacity.wind || 0,
+            capacity.hydro || 0,
+            capacity.biomass || 0,
+            capacity.others || 0
+        ];
+        const generationData = [
+            currentGen.solar || 0,
+            currentGen.wind || 0,
+            currentGen.hydro || 0,
+            currentGen.biomass || 0,
+            currentGen.others || 0
+        ];
+        
+        // Destroy existing chart if it exists
+        if (renewableChart) {
+            renewableChart.destroy();
+        }
+        
+        // Create chart
+        renewableChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Current Generation (MW)',
+                        data: generationData,
+                        backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                        borderColor: '#28a745',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Total Capacity (MW)',
+                        data: capacityData,
+                        backgroundColor: 'rgba(108, 117, 125, 0.5)',
+                        borderColor: '#6c757d',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#adb5bd'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#adb5bd',
+                            callback: function(value) {
+                                return formatNumber(value);
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#f8f9fa'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                return context.dataset.label + ': ' + formatNumber(value) + ' MW';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function updateRegionalTable(regions) {
+        const tableBody = document.getElementById('renewable-regional-tbody');
+        if (!tableBody) return;
+        
+        tableBody.innerHTML = '';
+        
+        Object.entries(regions).forEach(([region, data]) => {
+            const tr = document.createElement('tr');
+            
+            // Calculate total regional capacity
+            const totalCapacity = Object.values(data).reduce((sum, val) => sum + val, 0);
+            
+            // Calculate capacity factor (approximation for UI purposes)
+            const solarCF = 0.25; // Solar capacity factor (assumed)
+            const windCF = 0.35;  // Wind capacity factor (assumed)
+            const hydroCF = 0.4;  // Hydro capacity factor (assumed)
+            const biomassCF = 0.6; // Biomass capacity factor (assumed)
+            const othersCF = 0.5;  // Others capacity factor (assumed)
+            
+            const solarGen = data.solar * solarCF;
+            const windGen = data.wind * windCF;
+            const hydroGen = data.hydro * hydroCF;
+            const biomassGen = data.biomass * biomassCF;
+            const othersGen = data.others * othersCF;
+            
+            const totalGen = solarGen + windGen + hydroGen + biomassGen + othersGen;
+            const utilization = (totalGen / totalCapacity * 100).toFixed(1);
+            
+            // Determine utilization class
+            let utilizationClass, utilizationText;
+            if (utilization > 60) {
+                utilizationClass = 'high';
+                utilizationText = 'High';
+            } else if (utilization > 40) {
+                utilizationClass = 'medium';
+                utilizationText = 'Medium';
+            } else {
+                utilizationClass = 'low';
+                utilizationText = 'Low';
+            }
+            
+            tr.innerHTML = `
+                <td class="text-capitalize">${region}</td>
+                <td>${formatNumber(data.solar || 0)}</td>
+                <td>${formatNumber(data.wind || 0)}</td>
+                <td>${formatNumber(data.hydro || 0)}</td>
+                <td>${formatNumber(data.biomass || 0)}</td>
+                <td>${formatNumber(data.others || 0)}</td>
+                <td>${formatNumber(totalCapacity)}</td>
+                <td>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="progress bg-dark" style="width: 60%;">
+                            <div class="progress-bar bg-success" 
+                                role="progressbar" 
+                                style="width: ${utilization}%"
+                                aria-valuenow="${utilization}" 
+                                aria-valuemin="0" 
+                                aria-valuemax="100">
+                            </div>
+                        </div>
+                        <span class="generation-status ${utilizationClass} ms-2">${utilizationText}</span>
+                    </div>
+                </td>
+            `;
+            
+            tableBody.appendChild(tr);
+        });
+    }
+    
+    function displayError(message) {
+        // Show error in renewable table
+        const tableBody = document.getElementById('renewable-regional-tbody');
+        if (tableBody) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center">
+                        <div class="alert alert-danger mb-0">
+                            <i class="fa fa-exclamation-circle me-2"></i> ${message}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+    }
+    
+    function formatNumber(num) {
+        return new Intl.NumberFormat().format(Math.round(num));
+    }
+});
+</script>
+{% endblock %}
