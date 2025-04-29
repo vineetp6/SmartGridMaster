@@ -1,6 +1,6 @@
 # Smart Grid Management System
 
-An Autonomous Smart Grid Management Agent that integrates with Central Electricity Authority API to monitor, forecast, and optimize electrical grid operations.
+Autonomous Smart Grid Management Agent that integrates with Central Electricity Authority API to monitor, forecast, and optimize electrical grid operations.
 
 ## Overview
 
@@ -36,7 +36,7 @@ git clone https://github.com/yourusername/smart-grid-management.git
 cd smart-grid-management
 ```
 
-2. **Create a virtual environment**
+2. **Virtual environment**
 
 ```bash
 python -m venv venv
@@ -81,7 +81,7 @@ requests==2.32.3
 email-validator==2.1.0
 ```
 
-5. **Set up the database**
+5. **Set up database**
 
 Ensure PostgreSQL is running, then set the following environment variables:
 
@@ -103,7 +103,7 @@ The application will be available at `http://localhost:5000`.
 
 ## Running as a Windows 11 App
 
-You can package this application as a Windows 11 app using PyInstaller and create a desktop shortcut.
+Package this application as a Windows 11 app using PyInstaller and create a desktop shortcut.
 
 ### Packaging with PyInstaller
 
@@ -190,7 +190,7 @@ pyinstaller smart_grid.spec
 
 5. **Create Desktop Shortcut**
 
-- Right-click on your desktop
+- Right-click desktop
 - Select "New > Shortcut"
 - Browse to the location of `start_smart_grid.bat`
 - Name the shortcut "Smart Grid Management"
@@ -222,7 +222,7 @@ The application can be configured using environment variables:
 
 ## About Simulated Data
 
-This application is designed to work with the Central Electricity Authority (CEA) API, but it also includes a robust fallback mechanism that generates simulated data when the actual API is not available. This allows for:
+Application is designed to work with the Central Electricity Authority (CEA) API, but it also includes a robust fallback mechanism that generates simulated data when the actual API is not available. This allows for:
 
 1. Development and testing without requiring API access
 2. Demonstration of all features using realistic simulated grid data
@@ -260,6 +260,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Contact
 
-Your Name - youremail@example.com
+   Name - youremail@example.com
 
-Project Link: [https://github.com/yourusername/smart-grid-management](https://github.com/yourusername/smart-grid-management)
+Project Link: [https://github.com/yourusername/smart-grid-management](https://github.com/username/smart-grid-management)
