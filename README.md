@@ -254,12 +254,16 @@ The application uses the following database models:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+### App Images:
+- ![Screenshot 2025-04-30 131522](https://github.com/user-attachments/assets/2eab4055-4308-495b-a8f4-abe870e0538d)
+- ![Screenshot 2025-04-30 131744](https://github.com/user-attachments/assets/5a3a6471-505f-44d8-abca-517e30e82306)
+
 ## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Contact
 
-   Name - youremail@example.com
+   Name - email@example.com
 
-Project Link: [https://github.com/yourusername/smart-grid-management](https://github.com/username/smart-grid-management)
+Project Link: [https://github.com/username/smart-grid-management](https://github.com/username/smart-grid-management)
